@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='zin',
     maintainer_email='zinlinhtun34@gmail.com',
-    description='TODO: Package description',
+    description='Control Vehicle Low Level Communication and movements',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
