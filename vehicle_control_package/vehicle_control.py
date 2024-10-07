@@ -5,6 +5,7 @@ import dynamixel_sdk as dxl
 import time
 import rclpy
 from rclpy.node import Node
+from annex_msgs.msg import Vcu2ai
 
 
 MODE = {"SIM":1, "REAL":2}
