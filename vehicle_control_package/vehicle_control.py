@@ -25,7 +25,7 @@ class VehicleControl(Node):
 
             # Set the port and baudrate
             DEVICENAME = '/dev/ttyUSB0'  # Modify this according to your setup
-            BAUDRATE = 125000  # Modify this according to your Dynamixel configuration
+            BAUDRATE = 57600  # Modify this according to your Dynamixel configuration
 
             # Define protocol version
             PROTOCOL_VERSION = 2.0
@@ -59,9 +59,10 @@ class VehicleControl(Node):
                     print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
                 else:
                     print("Torque enabled")
+                    self.leg1_2_3(512, DXL_ID)
 
 
-    def leg1_2_3(self, val):
+    def leg1_2_3(self, val, DXL_ID):
 
             # Write goal position
             dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(portHandler, DXL_ID, 116, val)  # Write goal position
