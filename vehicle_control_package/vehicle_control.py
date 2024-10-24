@@ -31,20 +31,20 @@ class VehicleControl(Node):
             PROTOCOL_VERSION = 2.0
 
             # Initialize PortHandler instance
-            portHandler = PortHandler(DEVICENAME)
+            self.portHandler = PortHandler(DEVICENAME)
 
             # Initialize PacketHandler instance
-            packetHandler = PacketHandler(PROTOCOL_VERSION)
+            self.packetHandler = PacketHandler(PROTOCOL_VERSION)
 
             # Open the port
-            if portHandler.openPort():
+            if self.portHandler.openPort():
                 print("Succeeded to open the port")
             else:
                 print("Failed to open the port")
                 exit(1)
 
             # Set the baudrate
-            if portHandler.setBaudRate(BAUDRATE):
+            if self.portHandler.setBaudRate(BAUDRATE):
                 print("Succeeded to change the baudrate")
             else:
                 print("Failed to change the baudrate")
@@ -52,11 +52,11 @@ class VehicleControl(Node):
 
             # Enable torque for multiple motors
             for DXL_ID in SERVO_IDS:
-                dxl_comm_result, dxl_error = packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
+                dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
                 if dxl_comm_result != COMM_SUCCESS:
-                    print(f"TX is :: {dxl_comm_result} %s" % packetHandler.getTxRxResult(dxl_comm_result))
+                    print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
                 elif dxl_error != 0:
-                    print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
+                    print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
                 else:
                     print("Torque enabled")
                     self.leg1_2_3(512, DXL_ID)
@@ -65,11 +65,11 @@ class VehicleControl(Node):
     def leg1_2_3(self, val, DXL_ID):
 
             # Write goal position
-            dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(portHandler, DXL_ID, 116, val)  # Write goal position
+            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(portHandler, DXL_ID, 116, val)  # Write goal position
             if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % packetHandler.getTxRxResult(dxl_comm_result))
+                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
-                print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
+                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
             else:
                 print(f"Goal position set to: {val} neutral")
 
@@ -77,11 +77,11 @@ class VehicleControl(Node):
         self.op_mode = op_mode
 
         for DXL_ID in GEAR_IDS:
-            dxl_comm_result, dxl_error = packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 0 if self.op_mode == OP_MODE["SPIDER"] else 1)  # Torque enable
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 0 if self.op_mode == OP_MODE["SPIDER"] else 1)  # Torque enable
             if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % packetHandler.getTxRxResult(dxl_comm_result))
+                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
-                print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
+                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
             else:
                 print("Torque changed")
 
@@ -89,20 +89,20 @@ class VehicleControl(Node):
         # Enable torque for a single motor
         ids = [id]
         for DXL_ID in ids:
-            dxl_comm_result, dxl_error = packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
             if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % packetHandler.getTxRxResult(dxl_comm_result))
+                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
-                print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
+                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
             else:
                 print("Torque enabled")
 
             # Write goal position
-            dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(portHandler, DXL_ID, POSITION_ADDR, val)  # Write goal position
+            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(portHandler, DXL_ID, POSITION_ADDR, val)  # Write goal position
             if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % packetHandler.getTxRxResult(dxl_comm_result))
+                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
-                print("Error:: %s" % packetHandler.getRxPacketError(dxl_error))
+                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
             else:
                 print(f"Goal position set to: {val} neutral")
 
