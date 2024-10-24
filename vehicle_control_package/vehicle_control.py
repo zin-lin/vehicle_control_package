@@ -52,7 +52,7 @@ class VehicleControl(Node):
 
             # Enable torque for multiple motors
             for DXL_ID in SERVO_IDS:
-                dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
+                dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
                 if dxl_comm_result != COMM_SUCCESS:
                     print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
                 elif dxl_error != 0:
@@ -65,7 +65,7 @@ class VehicleControl(Node):
     def leg1_2_3(self, val, DXL_ID):
 
             # Write goal position
-            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(portHandler, DXL_ID, 116, val)  # Write goal position
+            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, DXL_ID, 116, val)  # Write goal position
             if dxl_comm_result != COMM_SUCCESS:
                 print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
@@ -77,7 +77,7 @@ class VehicleControl(Node):
         self.op_mode = op_mode
 
         for DXL_ID in GEAR_IDS:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 0 if self.op_mode == OP_MODE["SPIDER"] else 1)  # Torque enable
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR, 0 if self.op_mode == OP_MODE["SPIDER"] else 1)  # Torque enable
             if dxl_comm_result != COMM_SUCCESS:
                 print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
@@ -89,7 +89,7 @@ class VehicleControl(Node):
         # Enable torque for a single motor
         ids = [id]
         for DXL_ID in ids:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
             if dxl_comm_result != COMM_SUCCESS:
                 print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
@@ -98,7 +98,7 @@ class VehicleControl(Node):
                 print("Torque enabled")
 
             # Write goal position
-            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(portHandler, DXL_ID, POSITION_ADDR, val)  # Write goal position
+            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, DXL_ID, POSITION_ADDR, val)  # Write goal position
             if dxl_comm_result != COMM_SUCCESS:
                 print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
             elif dxl_error != 0:
@@ -120,7 +120,7 @@ class VehicleControl(Node):
 
     # Close port
     def end(self):
-        portHandler.closePort()
+        self.portHandler.closePort()
 
 
 # main method
