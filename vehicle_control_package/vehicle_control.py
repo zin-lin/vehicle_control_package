@@ -5,7 +5,7 @@ import dynamixel_sdk as dxl
 import time
 import rclpy
 from rclpy.node import Node
-from annex_msgs.msg import Vcu2ai
+from annex_msgs.msg import Con2vcu
 
 
 MODE = {"SIM":1, "REAL":2}
@@ -26,49 +26,69 @@ class VehicleControl(Node):
     def __init__(self):
         super().__init__('vehicle_control')
         if self.mode == MODE["REAL"]:
+            self._sub_pub()
+            # self._init_dynamixel_client()
 
-            # Set the port and baudrate
-            DEVICENAME = '/dev/ttyUSB0'  # Modify this according to your setup
-            BAUDRATE = 57600  # Modify this according to your Dynamixel configuration
 
-            # Define protocol version
-            PROTOCOL_VERSION = 2.0
+    # initialising dynamixels
+    def _init_dynamixel_client(self):
+        # Set the port and baudrate
+        DEVICENAME = '/dev/ttyUSB0'  # Modify this according to your setup
+        BAUDRATE = 57600  # Modify this according to your Dynamixel configuration
 
-            # Initialize PortHandler instance
-            self.portHandler = PortHandler(DEVICENAME)
+        # Define protocol version
+        PROTOCOL_VERSION = 2.0
 
-            # Initialize PacketHandler instance
-            self.packetHandler = PacketHandler(PROTOCOL_VERSION)
+        # Initialize PortHandler instance
+        self.portHandler = PortHandler(DEVICENAME)
 
-            # Open the port
-            if self.portHandler.openPort():
-                print("Succeeded to open the port")
+        # Initialize PacketHandler instance
+        self.packetHandler = PacketHandler(PROTOCOL_VERSION)
+
+        # Open the port
+        if self.portHandler.openPort():
+            print("Succeeded to open the port")
+        else:
+            print("Failed to open the port")
+            exit(1)
+
+        # Set the baudrate
+        if self.portHandler.setBaudRate(BAUDRATE):
+            print("Succeeded to change the baudrate")
+        else:
+            print("Failed to change the baudrate")
+            exit(1)
+
+        for DXL_ID in SERVO_IDS:
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR,
+                                                                           1)  # Torque enable
+            if dxl_comm_result != COMM_SUCCESS:
+                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
+            elif dxl_error != 0:
+                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
             else:
-                print("Failed to open the port")
-                exit(1)
+                print("Torque changed")
 
-            # Set the baudrate
-            if self.portHandler.setBaudRate(BAUDRATE):
-                print("Succeeded to change the baudrate")
-            else:
-                print("Failed to change the baudrate")
-                exit(1)
+        # Enable torque for multiple motors
+        # set neutral position
+        self.swing_neutral()
 
-            for DXL_ID in SERVO_IDS:
-                dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR,
-                                                                               1)  # Torque enable
-                if dxl_comm_result != COMM_SUCCESS:
-                    print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-                elif dxl_error != 0:
-                    print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
-                else:
-                    print("Torque changed")
+    # subcription and publishing
+    def _sub_pub(self):
+        self.create_subscription(Con2vcu, "control",  self.listener_callback, 10)
 
-            # Enable torque for multiple motors
-            # set neutral position
-            self.swing_neutral()
-
-        self.walk_forward()
+    # subcription callback
+    def listener_callback(self, msg):
+        # self.mode = msg.mode/1
+        cmd = msg.dir
+        if cmd == 1.0:
+            self.get_logger().info('w')
+        elif cmd == 2.0:
+            self.get_logger().info('a')
+        elif cmd == 3.0:
+            self.get_logger().info('d')
+        else:
+            self.get_logger().info('s')
 
     # single servo joint connection
     def writeGoalPos(self, val, DXL_ID):
@@ -209,17 +229,6 @@ class VehicleControl(Node):
             else:
                 print(f"Goal position set to: {val} neutral")
 
-    # Uncomment this section for continuous control
-    # count = 1
-    # while True:
-    #     if count % 2 == 0:
-    #         leg1_2_3(2000)
-    #     else:
-    #         leg1_2_3(0)
-    #     count += 1
-
-    # Set goal position for leg with ID 33 to 0
-    # leg(33, 0)
 
     # Close port
     def end(self):
