@@ -1,256 +1,247 @@
-# Author : Zin Lin Htun
-
-from dynamixel_sdk import *  # Dynamixel SDK library import
-import dynamixel_sdk as dxl
+"""
+Author: Zin Lin Htun
+"""
 import time
 import rclpy
 from rclpy.node import Node
-from annex_msgs.msg import Con2vcu
+from annex_msgs.msg import Con2vcu, Ai2vcu
+from os import environ as env
+from std_msgs.msg import Float64
+from sensor_msgs.msg import JointState
 
+from .components.convertor import Convertor
 
-MODE = {"SIM":1, "REAL":2}
-SERVO_IDS = [11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43]
-LEG_1 = [ 12, 13, 14]
-LEG_2 = [ 22, 23, 24]
-LEG_3 = [ 32, 33, 34]
-LEG_4 = [ 42, 43, 44]
-GEAR_IDS = [14, 24, 34, 44]
-OP_MODE = {"DRIVE":1, "SPIDER":2}
-TORQUE_ADDR = 64
-POSITION_ADDR = 116
+# CONSTANTS
 
-class VehicleControl(Node):
+JOINTS = [
+        'joint_1', 'joint_1_1', 'joint_1_1_1',
+        'joint_2', 'joint_2_1', 'joint_2_1_1',
+        'joint_3', 'joint_3_1', 'joint_3_1_1',
+        'joint_4', 'joint_4_1', 'joint_4_1_1'
+        ]
 
-    mode = MODE["REAL"]
-    op_mode = OP_MODE["SPIDER"]
+VALUES = [0.0,0.0,0.0,
+          0.0,0.0,0.0,
+          0.0,0.0,0.0,
+          0.0,0.0,0.0]
+
+# main class
+class VehicleControlEventUnit(Node):
     def __init__(self):
-        super().__init__('vehicle_control')
-        if self.mode == MODE["REAL"]:
-            self._sub_pub()
-            # self._init_dynamixel_client()
+        # initialise
+        super().__init__('vehicle_control_event_unit')
+        self.servos_pos_publishers = []
+        self._sub_pub()
+        self.values = VALUES
+        self.command = None
+        self.stage = 1
+        self.cycle = 1
 
+        # initialise feedback
+        self.feedback_state = []
 
-    # initialising dynamixels
-    def _init_dynamixel_client(self):
-        # Set the port and baudrate
-        DEVICENAME = '/dev/ttyUSB0'  # Modify this according to your setup
-        BAUDRATE = 57600  # Modify this according to your Dynamixel configuration
+        # initialise logger
+        self.logger = self.get_logger()
 
-        # Define protocol version
-        PROTOCOL_VERSION = 2.0
+        # initialise populate timer
+        self.publisher_timer = self.create_timer(0.1, self.populate_and_publish)
 
-        # Initialize PortHandler instance
-        self.portHandler = PortHandler(DEVICENAME)
+        # reset to starting pose
+        self._start_up_pos()
 
-        # Initialize PacketHandler instance
-        self.packetHandler = PacketHandler(PROTOCOL_VERSION)
-
-        # Open the port
-        if self.portHandler.openPort():
-            print("Succeeded to open the port")
-        else:
-            print("Failed to open the port")
-            exit(1)
-
-        # Set the baudrate
-        if self.portHandler.setBaudRate(BAUDRATE):
-            print("Succeeded to change the baudrate")
-        else:
-            print("Failed to change the baudrate")
-            exit(1)
-
-        for DXL_ID in SERVO_IDS:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR,
-                                                                           1)  # Torque enable
-            if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-            elif dxl_error != 0:
-                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
-            else:
-                print("Torque changed")
-
-        # Enable torque for multiple motors
-        # set neutral position
-        self.swing_neutral()
-
-    # subcription and publishing
+    # subscription and publishing
     def _sub_pub(self):
-        self.create_subscription(Con2vcu, "control",  self.listener_callback, 10)
+        # create subscription for control commands
+        self.create_subscription(Con2vcu, "control",  self.control_callback, 10)
 
-    # subcription callback
-    def listener_callback(self, msg):
-        # self.mode = msg.mode/1
-        cmd = msg.dir
-        if cmd == 1.0:
-            self.get_logger().info('w')
-        elif cmd == 2.0:
-            self.get_logger().info('a')
-        elif cmd == 3.0:
-            self.get_logger().info('d')
-        else:
-            self.get_logger().info('s')
+        # create subscription for joint states
+        self.create_subscription(JointState, "adsmt/joint_states", self.joint_states_callback, 10)
 
-    # single servo joint connection
-    def writeGoalPos(self, val, DXL_ID):
+        # create publications to all joints
+        for joint in JOINTS:
+            joint_pub = self.create_publisher(Float64,f"model/adsmt/joint/{joint}/x/cmd_pos", 10)
+            self.servos_pos_publishers.append(joint_pub)
 
-            # Write goal position
-            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, DXL_ID, 116, val)  # Write goal position
-            if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-            elif dxl_error != 0:
-                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
-            else:
-                print(f"Goal position set to: {val} neutral")
+    # start up position publisher
+    def _start_up_pos(self):
+        self.values = []
+        self.values = Convertor.start_up_pos()
 
-    def transform (self, op_mode):
-        self.op_mode = op_mode
+    # for each index range
+    def _publish_range_index (self, index, stop,step):
+        for i in range(index, stop, step):
+            msg = Float64()
+            msg.data = self.values[i]
+            self.servos_pos_publishers[i].publish(msg)
+            self.logger.info(f"published - {JOINTS[i]} -  {msg.data}")
 
-        for DXL_ID in GEAR_IDS:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR, 0 if self.op_mode == OP_MODE["SPIDER"] else 1)  # Torque enable
-            if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-            elif dxl_error != 0:
-                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
-            else:
-                print("Torque changed")
+    # right leap
+    def _right_leap(self):
+        leg1 = Convertor.leg1_leap_for()
+        leg2 = Convertor.leg2_leap_for()
+        leg3 = Convertor.leg3_reset()
+        leg4 = Convertor.leg4_reset()
+        self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
-    def swing_forward_right(self, leg=[] ):
-        for DID in leg:
-            if DID == 22 or DID == 42:
-                self.writeGoalPos(2050, DID)
-            else:
-                self.writeGoalPos(1350, DID)
+    # left leap
+    def _left_leap(self):
+        leg1 = Convertor.leg1_reset()
+        leg2 = Convertor.leg2_reset()
+        leg3 = Convertor.leg3_leap_for()
+        leg4 = Convertor.leg4_leap_for()
+        self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
-    def swing_backward_right(self, leg=[] ):
-        for DID in leg:
-            if DID == 22 or DID == 42:
-                self.writeGoalPos(1600, DID)
-            else:
-                self.writeGoalPos(1350, DID)
-
-    def swing_forward_left(self, leg=[] ):
-        for DID in leg:
-            if DID == 12 or DID == 32:
-                self.writeGoalPos(2050, DID)
-            else:
-                self.writeGoalPos(2750, DID)
-
-    def swing_neutral(self):
-        for DXL_ID in SERVO_IDS:
-            if DXL_ID == 12 or DXL_ID == 13 or DXL_ID == 32 or DXL_ID == 33:
-                if DXL_ID == 13 or DXL_ID == 33:
-                    self.writeGoalPos(2500, DXL_ID)
-                else:
-                    self.writeGoalPos(2250, DXL_ID)
-            # right legs
-            elif DXL_ID == 22 or DXL_ID == 23 or DXL_ID == 42 or DXL_ID == 43:
-                if DXL_ID == 23 or DXL_ID == 43:
-                    self.writeGoalPos(1600, DXL_ID)
-                else:
-                    self.writeGoalPos(1825, DXL_ID)
-            # wheels and joints
-            # else:
-            #     if DXL_ID == 11:
-            #         self.writeGoalPos(2000, DXL_ID)
-            #
-            #     if DXL_ID == 21:
-            #         self.writeGoalPos(2000, DXL_ID)
-            #
-            #     if DXL_ID == 31:
-            #         self.writeGoalPos(2000, DXL_ID)
-            #
-            #     else:
-            #         self.writeGoalPos(2000, DXL_ID)
-
-
-    def swing_backward_left(self, leg=[] ):
-        for DID in leg:
-            if DID == 12 or DID == 32:
-                self.writeGoalPos(2500, DID)
-            else:
-                self.writeGoalPos(2750, DID)
+    # all four reset
+    def _reset_walk(self):
+        leg1 = Convertor.leg1_reset()
+        leg2 = Convertor.leg2_reset()
+        leg3 = Convertor.leg3_reset()
+        leg4 = Convertor.leg4_reset()
+        self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
     # move forward
-    def walk_forward(self,):
-        # first half of the cycle
-        # left legs
-        self.swing_backward_left(LEG_1)
-        time.sleep(0.3)
-        self.swing_backward_left(LEG_3)
-        time.sleep(0.3)
+    def _forward_walk(self):
+        self.logger.info("w called")
 
-        # right legs
-        self.swing_forward_right(LEG_2)
-        time.sleep(0.3)
+        if not self.stage:
+            self.command = "w"
+            self.stage = 1
 
-        self.swing_forward_right(LEG_4)
-        time.sleep(0.3)
-
-        # neutral
-        self.swing_neutral()
-
-        # second half of the cycle
-        # left legs
-        self.swing_backward_right(LEG_2)
-        time.sleep(0.3)
-
-        self.swing_backward_right(LEG_4)
-        time.sleep(0.3)
-
-        # right legs
-        self.swing_forward_left(LEG_1)
-        time.sleep(0.3)
-
-        self.swing_forward_left(LEG_3)
-        time.sleep(0.3)
-
-        # neutral
-        self.swing_neutral()
-        return
-
-    def leg(self,id, val):
-        # Enable torque for a single motor
-        ids = [id]
-        for DXL_ID in ids:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID, TORQUE_ADDR, 1)  # Torque enable
-            if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-            elif dxl_error != 0:
-                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
+        if self.stage == 1:
+            # first half stage 2
+            self.logger.info("getting to stage 1")
+            if self.cycle % 2 == 1:
+                self._right_leap()
             else:
-                print("Torque enabled")
+                self._left_leap()
 
-            # Write goal position
-            dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, DXL_ID, POSITION_ADDR, val)  # Write goal position
-            if dxl_comm_result != COMM_SUCCESS:
-                print(f"TX is :: {dxl_comm_result} %s" % self.packetHandler.getTxRxResult(dxl_comm_result))
-            elif dxl_error != 0:
-                print("Error:: %s" % self.packetHandler.getRxPacketError(dxl_error))
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 2
+
+
+        if self.stage == 2:
+            # second half stage 3
+            self.logger.info("getting to stage 3")
+            # stage 3
+            if self.cycle % 2 == 1:
+                self._left_leap()
             else:
-                print(f"Goal position set to: {val} neutral")
+                self._right_leap()
+            if Convertor.in_range(self.values, self.feedback_state):
+                # resets
+                self.stage = 3
+
+        # reset
+        if self.stage == 3:
+            self.logger.info("getting to stage 2")
+            self._reset_walk()
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 4
+
+        if self.stage == 4:
+            # second half stage 3
+            self.logger.info("getting to stage 3")
+            # stage 3
+            if self.cycle % 2 == 1:
+                self._left_leap()
+            else:
+                self._right_leap()
+            if Convertor.in_range(self.values, self.feedback_state):
+                # resets
+                self.stage = 5
+
+        if self.stage == 5:
+            # first half stage 2
+            self.logger.info("getting to stage 1")
+            if self.cycle % 2 == 1:
+                self._right_leap()
+            else:
+                self._left_leap()
+
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 6
+
+        if self.stage == 6:
+            self.logger.info("getting to stage 4")
+            self._reset_walk()
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 1
+                self.cycle += 1
+
+    # subscription- joint_states callback
+    def joint_states_callback(self, msg:JointState):
+        self.feedback_state = msg.position
+
+    # subscription- control command callback
+    def control_callback(self, msg:Con2vcu):
+        cmd = msg.dir
+        if cmd == 1.0:
+            self.command = "w"
+            self.logger.info('w')
+        elif cmd == 2.0:
+            self.command = "a"
+            self.logger.info('a')
+        elif cmd == 3.0:
+            self.command = "d"
+            self.logger.info('d')
+        else:
+            self.command = "s"
+            self.logger.info('s')
+
+    # populate and publish the message
+    def populate_and_publish(self):
+        # match the command
+        match self.command:
+            case "w":
+                self._forward_walk()
+            case "a":
+                pass
+            case "d":
+                pass
+            case "s":
+                pass
+
+            case _:
+                self.logger.error('no command, just publishing')
+
+        # first joints
+        if self.stage % 2 == 0:
+
+            self._publish_range_index(6, 12, 3)
+            self._publish_range_index(0, 7, 3)
+
+            self._publish_range_index(7, 12, 3)
+            self._publish_range_index(1, 7, 3)
+
+            self._publish_range_index(8, 12, 3)
+            self._publish_range_index(2, 7, 3)
 
 
-    # Close port
-    def end(self):
-        self.portHandler.closePort()
+
+        else:
+            self._publish_range_index(0, 7,3)
+            self._publish_range_index(6, 12,3)
+
+            self._publish_range_index(1, 7,3)
+            self._publish_range_index(7, 12,3)
+
+            self._publish_range_index(2, 7,3)
+            self._publish_range_index(8, 12,3)
 
 
 # main method
 def main(args=None):
     rclpy.init(args=args)
-
-    vehicle_control = VehicleControl()
-
-    rclpy.spin(vehicle_control)
-
+    # get vcu node
+    vcu_node = VehicleControlEventUnit()
+    # spin it
+    rclpy.spin(vcu_node)
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    vehicle_control.destroy_node()
+    vcu_node.destroy_node()
     rclpy.shutdown()
 
 
 if __name__ == '__main__':
     main()
-
-
