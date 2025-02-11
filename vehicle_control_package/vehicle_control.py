@@ -25,6 +25,8 @@ VALUES = [0.0,0.0,0.0,
           0.0,0.0,0.0,
           0.0,0.0,0.0]
 
+LEGS = {'LEG-1':0, 'LEG-2':3, 'LEG-3':6, 'LEG-4':9}
+
 # main class
 class VehicleControlEventUnit(Node):
     def __init__(self):
@@ -75,19 +77,26 @@ class VehicleControlEventUnit(Node):
             self.servos_pos_publishers[i].publish(msg)
             self.logger.info(f"published - {JOINTS[i]} -  {msg.data}")
 
+    def _publish_leg(self, index):
+        for i in range(index,index+3,1):
+            msg = Float64()
+            msg.data = self.values[i]
+            self.servos_pos_publishers[i].publish(msg)
+            self.logger.info(f"published - {JOINTS[i]} -  {msg.data}")
+
     # right leap
-    def _right_leap(self):
+    def _for_leap(self):
         leg1 = Convertor.leg1_leap_for()
-        leg2 = Convertor.leg2_leap_for()
-        leg3 = Convertor.leg3_reset()
+        leg2 = Convertor.leg2_reset()
+        leg3 = Convertor.leg3_leap_for()
         leg4 = Convertor.leg4_reset()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
     # left leap
-    def _left_leap(self):
+    def _back_leap(self):
         leg1 = Convertor.leg1_reset()
-        leg2 = Convertor.leg2_reset()
-        leg3 = Convertor.leg3_leap_for()
+        leg2 = Convertor.leg2_leap_for()
+        leg3 = Convertor.leg3_reset()
         leg4 = Convertor.leg4_leap_for()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
@@ -99,7 +108,55 @@ class VehicleControlEventUnit(Node):
         leg4 = Convertor.leg4_reset()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
-    # move forward
+    # reset all states
+    def _reset_state(self):
+        self.stage = 1
+        self.command = None
+
+    # turn right
+    def _turn_right(self):
+        if self.stage == 1:
+            # first turn
+            self.values[LEGS['LEG-2']] = Convertor.joint_2_turn()
+            self.values[LEGS['LEG-4']] = Convertor.joint_4_turn()
+            leg1 = Convertor.leg1_leap_for()
+            leg3 = Convertor.leg3_leap_for()
+            leg2 = Convertor.leg_rest(self.values, LEGS['LEG-2'])
+            leg4 = Convertor.leg_rest(self.values, LEGS['LEG-4'])
+            self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
+
+            # check if position reached
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 2
+        elif self.stage == 2:
+            # reset
+            self._reset_walk()
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 1
+                time.sleep(0.100)
+
+    def _turn_left(self):
+        if self.stage == 1:
+            # first turn
+            self.values[LEGS['LEG-1']] = Convertor.joint_1_turn()
+            self.values[LEGS['LEG-3']] = Convertor.joint_3_turn()
+            leg2 = Convertor.leg2_leap_for()
+            leg4 = Convertor.leg4_leap_for()
+            leg1 = Convertor.leg_rest(self.values, LEGS['LEG-1'])
+            leg3 = Convertor.leg_rest(self.values, LEGS['LEG-3'])
+            self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
+
+            # check if position reached
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 2
+        elif self.stage == 2:
+            # reset
+            self._reset_walk()
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 1
+                time.sleep(0.100)
+
+                # move forward
     def _forward_walk(self):
         self.logger.info("w called")
 
@@ -110,10 +167,10 @@ class VehicleControlEventUnit(Node):
         if self.stage == 1:
             # first half stage 2
             self.logger.info("getting to stage 1")
-            if self.cycle % 2 == 1:
-                self._right_leap()
+            if self.cycle%2 == 0:
+                self._for_leap()
             else:
-                self._left_leap()
+                self._back_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 2
@@ -123,10 +180,11 @@ class VehicleControlEventUnit(Node):
             # second half stage 3
             self.logger.info("getting to stage 3")
             # stage 3
-            if self.cycle % 2 == 1:
-                self._left_leap()
+            if self.cycle%2 == 0:
+                self._back_leap()
             else:
-                self._right_leap()
+                self._for_leap()
+
             if Convertor.in_range(self.values, self.feedback_state):
                 # resets
                 self.stage = 3
@@ -142,10 +200,10 @@ class VehicleControlEventUnit(Node):
             # second half stage 3
             self.logger.info("getting to stage 3")
             # stage 3
-            if self.cycle % 2 == 1:
-                self._left_leap()
+            if self.cycle%2 == 0:
+                self._back_leap()
             else:
-                self._right_leap()
+                self._for_leap()
             if Convertor.in_range(self.values, self.feedback_state):
                 # resets
                 self.stage = 5
@@ -153,10 +211,10 @@ class VehicleControlEventUnit(Node):
         if self.stage == 5:
             # first half stage 2
             self.logger.info("getting to stage 1")
-            if self.cycle % 2 == 1:
-                self._right_leap()
+            if self.cycle % 2 == 0:
+                self._for_leap()
             else:
-                self._left_leap()
+                self._back_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 6
@@ -167,6 +225,14 @@ class VehicleControlEventUnit(Node):
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 1
                 self.cycle += 1
+                time.sleep(0.100)
+
+    # side turn walk
+    def _turn_walk(self, dir_walk):
+        if dir_walk:
+            self._turn_right()
+        else:
+            self._turn_left()
 
     # subscription- joint_states callback
     def joint_states_callback(self, msg:JointState):
@@ -175,6 +241,7 @@ class VehicleControlEventUnit(Node):
     # subscription- control command callback
     def control_callback(self, msg:Con2vcu):
         cmd = msg.dir
+        self.stage = 1
         if cmd == 1.0:
             self.command = "w"
             self.logger.info('w')
@@ -184,9 +251,13 @@ class VehicleControlEventUnit(Node):
         elif cmd == 3.0:
             self.command = "d"
             self.logger.info('d')
-        else:
+        elif cmd == 4.0:
             self.command = "s"
             self.logger.info('s')
+        else:
+            self.command = None
+            self.logger.info('unknown/stop command: stopping')
+
 
     # populate and publish the message
     def populate_and_publish(self):
@@ -195,38 +266,49 @@ class VehicleControlEventUnit(Node):
             case "w":
                 self._forward_walk()
             case "a":
-                pass
+                self._turn_walk(False)
             case "d":
-                pass
+                self._turn_walk(True)
             case "s":
                 pass
 
             case _:
+                self._reset_walk()
+                self._reset_state()
                 self.logger.error('no command, just publishing')
 
         # first joints
-        if self.stage % 2 == 0:
+        if self.cycle % 2 == 0:
 
-            self._publish_range_index(6, 12, 3)
-            self._publish_range_index(0, 7, 3)
+            if self.stage % 2 == 1:
+                self._publish_leg(LEGS['LEG-2'])  # 2 and 4 first
+                self._publish_leg(LEGS['LEG-4'])
 
-            self._publish_range_index(7, 12, 3)
-            self._publish_range_index(1, 7, 3)
+                self._publish_leg(LEGS['LEG-1'])  # 1 and 3 later
+                self._publish_leg(LEGS['LEG-3'])
+            else:
+                self._publish_leg(LEGS['LEG-1'])  # 1 and 3 first
+                self._publish_leg(LEGS['LEG-3'])
 
-            self._publish_range_index(8, 12, 3)
-            self._publish_range_index(2, 7, 3)
+                self._publish_leg(LEGS['LEG-2'])  # 2 and 4 later
+                self._publish_leg(LEGS['LEG-4'])
 
 
 
         else:
-            self._publish_range_index(0, 7,3)
-            self._publish_range_index(6, 12,3)
+            # cycle odd
+            if self.stage % 2== 1:
+                self._publish_leg(LEGS['LEG-1']) # 1 and 3 first
+                self._publish_leg(LEGS['LEG-3'])
 
-            self._publish_range_index(1, 7,3)
-            self._publish_range_index(7, 12,3)
+                self._publish_leg(LEGS['LEG-2']) # 2 and 4 later
+                self._publish_leg(LEGS['LEG-4'])
+            else:
+                self._publish_leg(LEGS['LEG-2'])  # 2 and 4 first
+                self._publish_leg(LEGS['LEG-4'])
 
-            self._publish_range_index(2, 7,3)
-            self._publish_range_index(8, 12,3)
+                self._publish_leg(LEGS['LEG-1']) # 1 and 3 later
+                self._publish_leg(LEGS['LEG-3'])
 
 
 # main method
