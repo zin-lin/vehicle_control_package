@@ -39,32 +39,74 @@ class Convertor:
 
     @staticmethod
     def leg2_leap_back():
-        return [0.0, -0.75, 1.55]
+        return [0.0, 0.75, -1.55]
 
     @staticmethod
     def leg4_leap_back():
-        return [0.0, 0.75, -1.55]
+        return [0.0, -0.75, 1.55]
 
     @staticmethod
     def leg3_leap_back():
         return [0.0, -0.75, 1.55]
 
-    # leap forward
+    # leap forward methods
     @staticmethod
     def leg1_leap_for():
-        return [.05, 0.05, -1.00]
+        return [.0, 0.05, -1.00]
+
+    @staticmethod
+    def leg1_leap_for_05():
+        return [.0, 0.25, -1.20]
 
     @staticmethod
     def leg2_leap_for():
-        return [-.05, 0.05, -1.00]
+        return [-.0, 0.05, -1.00]
+
+    @staticmethod
+    def leg2_leap_for_05():
+        return [.0, 0.25, -1.20]
 
     @staticmethod
     def leg3_leap_for():
-        return [.05, -0.05, 1.0]
+        return [.0, -0.05, 1.0]
+
+    @staticmethod
+    def leg3_leap_for_05():
+        return [.0, -0.25, 1.20]
 
     @staticmethod
     def leg4_leap_for():
-        return [-0.05, -0.05, 1.00]
+        return [-0.0, -0.05, 1.00]
+
+    @staticmethod
+    def leg4_leap_for_05():
+        return [.05, -0.25, 1.20]
+
+    # back legs slip forward methods
+    @staticmethod
+    def leg3_slip_forward():
+        return [.05, -0.05, 1.00]
+
+    @staticmethod
+    def leg4_slip_forward():
+        return [.05, -0.05, 1.00]
+
+    # jump forward methods
+    @staticmethod
+    def leg1_jump_for():
+        return [.05, 0.05, -1.60]
+
+    @staticmethod
+    def leg2_jump_for():
+        return [-.05, 0.05, -1.60]
+
+    @staticmethod
+    def leg3_jump_for():
+        return [.05, -0.05, 1.60]
+
+    @staticmethod
+    def leg4_jump_for():
+        return [-.05, -0.05, 1.60]
 
     @staticmethod
     def joint_1_turn():

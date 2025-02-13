@@ -12,13 +12,16 @@ from sensor_msgs.msg import JointState
 from .components.convertor import Convertor
 
 # CONSTANTS
-
 JOINTS = [
         'joint_1', 'joint_1_1', 'joint_1_1_1',
         'joint_2', 'joint_2_1', 'joint_2_1_1',
         'joint_3', 'joint_3_1', 'joint_3_1_1',
         'joint_4', 'joint_4_1', 'joint_4_1_1'
         ]
+
+WHEELS = [
+    'wheel_1', 'wheel_2', 'wheel_3', 'wheel_4'
+]
 
 VALUES = [0.0,0.0,0.0,
           0.0,0.0,0.0,
@@ -33,8 +36,10 @@ class VehicleControlEventUnit(Node):
         # initialise
         super().__init__('vehicle_control_event_unit')
         self.servos_pos_publishers = []
+        self.wheel_velocity_publishers = []
         self._sub_pub()
-        self.values = VALUES
+        self.values = VALUES # joint values
+        self.wheel_values = [0.0,0.0,0.0,0.0]
         self.command = None
         self.stage = 1
         self.cycle = 1
@@ -54,7 +59,10 @@ class VehicleControlEventUnit(Node):
     # subscription and publishing
     def _sub_pub(self):
         # create subscription for control commands
-        self.create_subscription(Con2vcu, "control",  self.control_callback, 10)
+        self.create_subscription(Con2vcu, "adsmt/manual_control",  self.control_callback, 10)
+
+        # create subscription for path_planning commands
+        self.create_subscription(Con2vcu, "adsmt/path_planning",  self.control_callback, 10)
 
         # create subscription for joint states
         self.create_subscription(JointState, "adsmt/joint_states", self.joint_states_callback, 10)
@@ -63,6 +71,13 @@ class VehicleControlEventUnit(Node):
         for joint in JOINTS:
             joint_pub = self.create_publisher(Float64,f"model/adsmt/joint/{joint}/x/cmd_pos", 10)
             self.servos_pos_publishers.append(joint_pub)
+
+        # create publications to all wheels
+        for wheel in WHEELS:
+            wheel_pub = self.create_publisher(Float64,f"model/adsmt/joint/{wheel}/cmd_vel", 10)
+            self.wheel_velocity_publishers.append(wheel_pub)
+
+
 
     # start up position publisher
     def _start_up_pos(self):
@@ -84,16 +99,17 @@ class VehicleControlEventUnit(Node):
             self.servos_pos_publishers[i].publish(msg)
             self.logger.info(f"published - {JOINTS[i]} -  {msg.data}")
 
-    # right leap
-    def _for_leap(self):
+    # leaf leap begins
+    def _left_leap(self):
         leg1 = Convertor.leg1_leap_for()
         leg2 = Convertor.leg2_reset()
         leg3 = Convertor.leg3_leap_for()
         leg4 = Convertor.leg4_reset()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
-    # left leap
-    def _back_leap(self):
+
+    # right leap begins
+    def _right_leap(self):
         leg1 = Convertor.leg1_reset()
         leg2 = Convertor.leg2_leap_for()
         leg3 = Convertor.leg3_reset()
@@ -112,8 +128,9 @@ class VehicleControlEventUnit(Node):
     def _reset_state(self):
         self.stage = 1
         self.command = None
+        self.wheel_values = [0.0, 0.0, 0.0, 0.0]
 
-    # turn right
+    # turn right command
     def _turn_right(self):
         if self.stage == 1:
             # first turn
@@ -135,6 +152,7 @@ class VehicleControlEventUnit(Node):
                 self.stage = 1
                 time.sleep(0.100)
 
+    # turn left command
     def _turn_left(self):
         if self.stage == 1:
             # first turn
@@ -156,71 +174,87 @@ class VehicleControlEventUnit(Node):
                 self.stage = 1
                 time.sleep(0.100)
 
-                # move forward
+    # def forward jump
+    def _forward_jump(self):
+        self.logger.info("jf called")
+        if self.stage == 1:
+            leg1 = Convertor.leg1_reset()
+            leg2 = Convertor.leg2_reset()
+            leg3 = Convertor.leg3_leap_for()
+            leg4 = Convertor.leg4_leap_for()
+            self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 2
+
+        if self.stage == 2:
+            leg1 = Convertor.leg1_jump_for()
+            leg2 = Convertor.leg2_jump_for()
+            leg3 = Convertor.leg3_leap_back()
+            leg4 = Convertor.leg4_leap_back()
+            self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
+            if Convertor.in_range(self.values, self.feedback_state):
+                self.stage = 3
+
+        if self.stage == 3:
+            self._reset_walk()
+            self._reset_state()
+
+    # drive forward
+    def _drive_forward(self):
+        self.logger.info("df called")
+        self.wheel_values = None
+        self.wheel_values = [15.0, 15.0, -15.0, -15.0]
+
+    # drive right
+    def _drive_right(self):
+        self.logger.info("dr called")
+        self.wheel_values = None
+        self.wheel_values = [20.0, 10.0, -20.0, -10.0]
+
+    # drive left
+    def _drive_left(self):
+        self.logger.info("dl called")
+        self.wheel_values = None
+        self.wheel_values = [10.0, 20.0, -10.0, -20.0]
+
+    # move forward
     def _forward_walk(self):
         self.logger.info("w called")
 
+        # stage setter if not available
         if not self.stage:
             self.command = "w"
             self.stage = 1
 
+        # stage 1
         if self.stage == 1:
             # first half stage 2
             self.logger.info("getting to stage 1")
             if self.cycle%2 == 0:
-                self._for_leap()
+                self._right_leap()
             else:
-                self._back_leap()
+                self._left_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 2
 
-
+        # stage 2
         if self.stage == 2:
             # second half stage 3
             self.logger.info("getting to stage 3")
             # stage 3
             if self.cycle%2 == 0:
-                self._back_leap()
+                self._left_leap()
             else:
-                self._for_leap()
+                self._right_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 # resets
                 self.stage = 3
 
-        # reset
+        # reset - stage 3 of a complete walk cycle
         if self.stage == 3:
             self.logger.info("getting to stage 2")
-            self._reset_walk()
-            if Convertor.in_range(self.values, self.feedback_state):
-                self.stage = 4
-
-        if self.stage == 4:
-            # second half stage 3
-            self.logger.info("getting to stage 3")
-            # stage 3
-            if self.cycle%2 == 0:
-                self._back_leap()
-            else:
-                self._for_leap()
-            if Convertor.in_range(self.values, self.feedback_state):
-                # resets
-                self.stage = 5
-
-        if self.stage == 5:
-            # first half stage 2
-            self.logger.info("getting to stage 1")
-            if self.cycle % 2 == 0:
-                self._for_leap()
-            else:
-                self._back_leap()
-
-            if Convertor.in_range(self.values, self.feedback_state):
-                self.stage = 6
-
-        if self.stage == 6:
-            self.logger.info("getting to stage 4")
             self._reset_walk()
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 1
@@ -241,7 +275,8 @@ class VehicleControlEventUnit(Node):
     # subscription- control command callback
     def control_callback(self, msg:Con2vcu):
         cmd = msg.dir
-        self.stage = 1
+        # get command from ros and set them with values
+        self._reset_state()
         if cmd == 1.0:
             self.command = "w"
             self.logger.info('w')
@@ -254,12 +289,24 @@ class VehicleControlEventUnit(Node):
         elif cmd == 4.0:
             self.command = "s"
             self.logger.info('s')
+        elif cmd == 5.0:
+            self.command = "jf"
+            self.logger.info('jf')
+        elif cmd == 6.0:
+            self.command = "df"
+            self.logger.info('df')
+        elif cmd == 7.0:
+            self.command = "dr"
+            self.logger.info('df')
+        elif cmd == 8.0:
+            self.command = "dl"
+            self.logger.info('df')
         else:
             self.command = None
             self.logger.info('unknown/stop command: stopping')
 
 
-    # populate and publish the message
+    # populate and publish the message use to publish commands to either sim or dynamixels
     def populate_and_publish(self):
         # match the command
         match self.command:
@@ -271,13 +318,28 @@ class VehicleControlEventUnit(Node):
                 self._turn_walk(True)
             case "s":
                 pass
-
+            case "jf":
+                self._forward_jump()
+            case "df":
+                self._reset_walk() # important to have an unbiased angular drive
+                self._drive_forward()
+            case "dr":
+                self._reset_walk() # important to have an unbiased angular drive
+                self._drive_right()
+            case "dl":
+                self._reset_walk() # important to have an unbiased angular drive
+                self._drive_left()
+            # default
             case _:
                 self._reset_walk()
                 self._reset_state()
                 self.logger.error('no command, just publishing')
 
-        # first joints
+        """
+            Cycles are set so that there won't be biases on each side
+            This is important to limit skidding 
+        """
+        # cycle even
         if self.cycle % 2 == 0:
 
             if self.stage % 2 == 1:
@@ -309,6 +371,13 @@ class VehicleControlEventUnit(Node):
 
                 self._publish_leg(LEGS['LEG-1']) # 1 and 3 later
                 self._publish_leg(LEGS['LEG-3'])
+
+        # wheel publishers
+        for i in range(len(self.wheel_velocity_publishers)):
+            msg = Float64()
+            msg.data = self.wheel_values[i]
+            self.wheel_velocity_publishers[i].publish(msg)
+            self.logger.info(f"published - {WHEELS[i]} -  {msg.data}")
 
 
 # main method
