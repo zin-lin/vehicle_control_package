@@ -152,3 +152,13 @@ class Convertor:
         values = []
         values.extend(Convertor.extend_legs(leg1, leg2, leg3, leg4))
         return values
+
+    # lean commands
+    @staticmethod
+    def lean_right(rad):
+        leg2 = [0.0, (0.55+rad), -(1.45+rad)]
+        leg4 = [0.0, -(0.55-rad), (1.45-rad)]
+        leg1 = Convertor.leg1_reset()
+        leg3 = Convertor.leg3_reset()
+
+        return Convertor.extend_legs(leg1, leg2, leg3, leg4)

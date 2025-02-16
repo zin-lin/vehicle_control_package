@@ -1,14 +1,18 @@
 """
 Author: Zin Lin Htun
 """
+# import py libs
 import time
+# import ROS
 import rclpy
 from rclpy.node import Node
+# import ADS-MT specifics
 from annex_msgs.msg import Con2vcu, Ai2vcu
-from os import environ as env
+# import Sim and Practical Msgs
 from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
-
+from sensor_msgs.msg import Imu
+# import components
 from .components.convertor import Convertor
 
 # CONSTANTS
@@ -199,6 +203,15 @@ class VehicleControlEventUnit(Node):
             self._reset_walk()
             self._reset_state()
 
+    # hybrid commands
+    # hybrid forward
+    def _hybrid_forward(self):
+        # executing
+        self.logger.info("hf called")
+        self._drive_forward()
+
+
+    # drive commands
     # drive forward
     def _drive_forward(self):
         self.logger.info("df called")
@@ -206,16 +219,18 @@ class VehicleControlEventUnit(Node):
         self.wheel_values = [15.0, 15.0, -15.0, -15.0]
 
     # drive right
-    def _drive_right(self):
+    def _drive_right(self, k_rad=0.5, i_vel=20.0 ):
         self.logger.info("dr called")
         self.wheel_values = None
-        self.wheel_values = [20.0, 10.0, -20.0, -10.0]
+        value = i_vel # initial turn velocity
+        self.wheel_values = [value, (value*k_rad), -value, -(value*k_rad)]
 
     # drive left
-    def _drive_left(self):
+    def _drive_left(self, k_rad=0.5, i_vel=20.0):
         self.logger.info("dl called")
         self.wheel_values = None
-        self.wheel_values = [10.0, 20.0, -10.0, -20.0]
+        value = i_vel # initial turn velocity
+        self.wheel_values = [(value*k_rad), 20.0, -(value*k_rad), -value]
 
     # move forward
     def _forward_walk(self):
@@ -301,12 +316,21 @@ class VehicleControlEventUnit(Node):
         elif cmd == 8.0:
             self.command = "dl"
             self.logger.info('df')
+        elif cmd == 9.0:
+            self.command = "hf"
+            self.logger.info('hf')
+        elif cmd == 10.0:
+            self.command = "hr"
+            self.logger.info('hf')
+        elif cmd == 11.0:
+            self.command = "hl"
+            self.logger.info('hf')
         else:
             self.command = None
             self.logger.info('unknown/stop command: stopping')
 
 
-    # populate and publish the message use to publish commands to either sim or dynamixels
+    # populate and publish the message use to publish commands to either sim or dynamixel servos
     def populate_and_publish(self):
         # match the command
         match self.command:
@@ -354,7 +378,6 @@ class VehicleControlEventUnit(Node):
 
                 self._publish_leg(LEGS['LEG-2'])  # 2 and 4 later
                 self._publish_leg(LEGS['LEG-4'])
-
 
 
         else:
