@@ -12,7 +12,7 @@ launch = 'launch'
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name, dynamixel, components, parameters],
+    packages=[package_name, dynamixel, components, parameters, launch],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -29,7 +29,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'vehicle_control=vehicle_control_package.vehicle_control:main'
+            'vehicle_control=vehicle_control_package.vehicle_control:main',
+            'dynamixel=vehicle_control_package.dynamixel.dynamixel_publisher_node:main'
         ],
     },
 )
