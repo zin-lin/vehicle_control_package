@@ -27,11 +27,26 @@ def generate_launch_description():
         output='both', # both means both log files and terminal
     )
 
+    imu_node = Node(
+        package='motion_package',
+        executable='imu',
+        output='both', # both means both log files and terminal
+    )
+
+    odometry_node = Node(
+        package='motion_package',
+        executable='odometry',
+        output='both',  # both means both log files and terminal
+    )
+
+
     # empty launch_des
     launch_description = LaunchDescription()
 
     # launch extra components
     launch_description.add_action(vcu_node) # adding vcu control unit
+    launch_description.add_action(imu_node) # adding vcu control unit
+    launch_description.add_action(odometry_node) # adding vcu control unit
 
 
     return launch_description

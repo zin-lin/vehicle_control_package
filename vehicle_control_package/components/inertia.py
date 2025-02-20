@@ -11,3 +11,4 @@ def inertia_cylinder(mass, radius):
 
 var = inertia_body(0.018, 0.034, 0.034)
 print(var)
+print(inertia_body(0.018, 0.034, 0.034))
