@@ -7,11 +7,10 @@ import time
 import rclpy
 from rclpy.node import Node
 # import ADS-MT specifics
-from annex_msgs.msg import Con2vcu, Ai2vcu
+from annex_msgs.msg import Con2vcu
 # import Sim and Practical Msgs
 from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
-from sensor_msgs.msg import Imu
 # import components
 from .components.convertor import Convertor
 
@@ -64,6 +63,7 @@ class VehicleControlEventUnit(Node):
     def _sub_pub(self):
         # create subscription for control commands
         self.create_subscription(Con2vcu, "adsmt/manual_control",  self.control_callback, 10)
+        self.create_subscription(Con2vcu, "adsmt/autonomous_control",  self.control_callback, 10)
 
         # create subscription for path_planning commands
         self.create_subscription(Con2vcu, "adsmt/path_planning",  self.control_callback, 10)
@@ -219,18 +219,18 @@ class VehicleControlEventUnit(Node):
         self.wheel_values = [15.0, 15.0, -15.0, -15.0]
 
     # drive right
-    def _drive_right(self, k_rad=0.5, i_vel=20.0 ):
+    def _drive_right(self, k_rad=0.5, i_vel=15.0 ):
         self.logger.info("dr called")
         self.wheel_values = None
         value = i_vel # initial turn velocity
         self.wheel_values = [value, (value*k_rad), -value, -(value*k_rad)]
 
     # drive left
-    def _drive_left(self, k_rad=0.5, i_vel=20.0):
+    def _drive_left(self, k_rad=0.5, i_vel=15.0):
         self.logger.info("dl called")
         self.wheel_values = None
         value = i_vel # initial turn velocity
-        self.wheel_values = [(value*k_rad), 20.0, -(value*k_rad), -value]
+        self.wheel_values = [(value*k_rad), value, -(value*k_rad), -value]
 
     # move forward
     def _forward_walk(self):
@@ -290,6 +290,7 @@ class VehicleControlEventUnit(Node):
     # subscription- control command callback
     def control_callback(self, msg:Con2vcu):
         cmd = msg.dir
+        deg = msg.deg
         # get command from ros and set them with values
         self._reset_state()
         if cmd == 1.0:
