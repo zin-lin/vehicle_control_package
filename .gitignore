@@ -12,3 +12,5 @@
 *.bash
 
 *.env
+
+*/__pycache__/
