@@ -14,14 +14,18 @@ class DynamixelController:
         self.publisher_node = node
         self.logger = self.publisher_node.get_logger()
         # initiate joints variables
-        self.joints = [11, 12, 13,
-                       21, 22, 23,
-                       31, 32, 33,
-                       41, 42, 43]
-        self.feedback = [2050, 2050, 2050,
-                         2050, 2050, 2050,
-                         2050, 2050, 2050,
-                         2050, 2050, 2050,]
+        self.joints = [
+           11, 12, 13,
+           21, 22, 23,
+           31, 32, 33,
+           41, 42, 43
+        ]
+        self.feedback = [
+                    2050, 2050, 2050,
+                    2050, 2050, 2050,
+                    2050, 2050, 2050,
+                    2050, 2050, 2050
+                    ]
         self.wheels = [14, 24, 34, 44]
         # self.dynamixel attributes
         self.device_name = device_name
@@ -110,18 +114,20 @@ class DynamixelController:
         param_goal_position = value.to_bytes(4,'little', signed=False)
         dxl_addparam_result = self.joint_sync_write.addParam(joint_id, param_goal_position)
         if not dxl_addparam_result:
-            self.logger.info(f"Failed to add parameter for ID {joint_id}")
+            self.logger.info(f"Failed to add parameter for ID {joint_id}, - {param_goal_position}")
 
     # write goal position
     def write_goal_position(self, msg_positions:[]):
         for i in range(len(msg_positions)):
             self._write_parameters_position(self.joints[i], msg_positions[i])
+            self.logger.info(f"Goal position for ID {msg_positions[i]}")
 
         # actually write stuff
         dxl_comm_result = self.joint_sync_write.txPacket()
         if dxl_comm_result != COMM_SUCCESS:
             self.logger.info(f"Sync write failed: {self.packetHandler.getTxRxResult(dxl_comm_result)}")
 
+        self.logger.info("Positions set, clearing message parameters")
         # Clear the parameters after sending
         self.joint_sync_write.clearParam()
 
@@ -130,10 +136,11 @@ class DynamixelController:
         for joint_id in self.joints:
             dxl_addparam_result = self.joint_sync_read.addParam(joint_id)
             if not dxl_addparam_result:
-                self.logger.info(f"Failed to add parameter for JOINT of ID {joint_id}")
-                exit()
+                self.logger.info(f"Failed to add parameter for JOINT of ID {joint_id} ok ")
+                # exit()
 
         # Perform de Operation: Sync Read
+        time.sleep(0.07)
         dxl_comm_result = self.joint_sync_read.txRxPacket()
         if dxl_comm_result != COMM_SUCCESS:
             self.logger.info(f"Communication failed: {self.packetHandler.getTxRxResult(dxl_comm_result)}")
@@ -151,6 +158,8 @@ class DynamixelController:
             else:
                 self.logger.info(f"Failed to get data for ID {joint_id}")
             count += 1
+        for i in self.feedback:
+            self.logger.info(f"Dynamixel ID {i} - Feedback: {i}")
 
     # write sync param for velocity
     def _write_parameters_velocity(self, wheel_id, value):
@@ -176,8 +185,19 @@ class DynamixelController:
     def in_range(self, msg_positions:[]):
         self._get_feedback()
         for i in range(len(msg_positions)):
-            if  not ((msg_positions[i] + 0.005) >= self.feedback[i] >= (msg_positions[i] - 0.005)):
+            if  not ((msg_positions[i] + 250) >= self.feedback[i] >= (msg_positions[i] - 250)):
                 return False
+        return True
+
+    # reset
+    @staticmethod
+    def reset():
+        return [
+            2050, 1750, 1450,
+            2050, 1750, 1450,
+            2050, 1750, 1450,
+            2050, 1750, 1450
+        ]
 
     # close port
     def shutdown(self):
