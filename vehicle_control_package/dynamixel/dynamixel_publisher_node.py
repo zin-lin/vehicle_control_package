@@ -1,7 +1,7 @@
-# Author : Zin Lin Htun
-from dynamixel_sdk import *  # Dynamixel SDK library import
-import dynamixel_sdk as dxl
-import time
+"""
+Author : Zin Lin Htun
+"""
+
 import rclpy
 from rclpy.node import Node
 from annex_msgs.msg import Con2vcu
@@ -70,7 +70,7 @@ class DynamixelPublisher(Node):
         self.create_subscription(Con2vcu, 'adsmt/manual_control', self.control_callback, 10)
         self.create_subscription(Con2vcu, 'adsmt/autonomous_control', self.control_callback, 10)
         # publishes every seconds
-        self.timer = self.create_timer(0.5, self.publish_and_populate)
+        self.timer = self.create_timer(0.2, self.publish_and_populate)
 
     # forward
     def _forward(self):
@@ -140,10 +140,9 @@ class DynamixelPublisher(Node):
 
 # main method
 def main(args=None):
+
     rclpy.init(args=args)
-
     dynamixel_publisher = DynamixelPublisher()
-
     rclpy.spin(dynamixel_publisher)
 
     # Destroy the node explicitly
