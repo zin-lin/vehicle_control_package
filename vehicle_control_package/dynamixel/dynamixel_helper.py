@@ -68,5 +68,5 @@ class DynamixelHelper:
     # drive left
     @staticmethod
     def drive_left():
-        velocities = [100, -445, 445, -100]
+        velocities = [100, -445, 100, -445]
         return velocities

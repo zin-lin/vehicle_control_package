@@ -80,18 +80,18 @@ class ControlEventUnit(Node):
 
     # leaf leap begins
     def _left_leap(self):
-        leg1 = Convertor.leg1_leap_for()
-        leg2 = Convertor.leg2_reset()
+        leg1 = Convertor.leg1_leap_back()
+        leg2 = Convertor.leg2_leap_for()
         leg3 = Convertor.leg3_leap_for()
-        leg4 = Convertor.leg4_reset()
+        leg4 = Convertor.leg4_leap_back()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 
 
     # right leap begins
     def _right_leap(self):
-        leg1 = Convertor.leg1_reset()
-        leg2 = Convertor.leg2_leap_for()
-        leg3 = Convertor.leg3_reset()
+        leg1 = Convertor.leg1_leap_for()
+        leg2 = Convertor.leg2_leap_back()
+        leg3 = Convertor.leg3_leap_back()
         leg4 = Convertor.leg4_leap_for()
         self.values = Convertor.extend_legs(leg1, leg2, leg3, leg4)
 

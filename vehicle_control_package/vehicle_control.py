@@ -73,36 +73,30 @@ class VehicleControlEventUnit(ControlEventUnit):
         if self.stage == 1:
             # first half stage 2
             self.logger.info("getting to stage 1")
-            if self.cycle%2 == 0:
-                self._right_leap()
-            else:
-                self._left_leap()
+            self._left_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 2
 
         # stage 2
         if self.stage == 2:
-            # second half stage 3
-            self.logger.info("getting to stage 3")
+            # second half stage 2
+            self.logger.info("getting to stage 2")
             # stage 3
-            if self.cycle%2 == 0:
-                self._left_leap()
-            else:
-                self._right_leap()
+            self._right_leap()
 
             if Convertor.in_range(self.values, self.feedback_state):
                 # resets
-                self.stage = 3
-
-        # reset - stage 3 of a complete walk cycle
-        if self.stage == 3:
-            self.logger.info("getting to stage 2")
-            self._reset_walk()
-            if Convertor.in_range(self.values, self.feedback_state):
                 self.stage = 1
-                self.cycle += 1
-                time.sleep(0.100)
+
+        # # stage 3
+        # if self.stage == 3:
+        #     self.logger.info("getting to stage 3")
+        #     self._reset_walk()
+        #     if Convertor.in_range(self.values, self.feedback_state):
+        #         self.stage = 1
+        #         self.cycle+=1
+
 
     # side turn walk
     def _turn_walk(self, dir_walk):

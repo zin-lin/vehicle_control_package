@@ -35,52 +35,37 @@ class Convertor:
     # draw_back
     @staticmethod
     def leg1_leap_back():
-        return [0.0, 0.75, -1.55]
+        return [0.0, 0.8, -1.00]
 
     @staticmethod
     def leg2_leap_back():
-        return [0.0, 0.75, -1.55]
-
-    @staticmethod
-    def leg4_leap_back():
-        return [0.0, -0.75, 1.55]
+        return [0.0, 0.8, -1.00]
 
     @staticmethod
     def leg3_leap_back():
-        return [0.0, -0.75, 1.55]
+        return [0.0, -0.8, 1.00]
+
+    @staticmethod
+    def leg4_leap_back():
+        return [0.0, -0.8, 1.00]
 
     # leap forward methods
     @staticmethod
     def leg1_leap_for():
-        return [.0, 0.05, -1.00]
-
-    @staticmethod
-    def leg1_leap_for_05():
-        return [.0, 0.25, -1.20]
+        return [.0, 0.05, -1.7]
 
     @staticmethod
     def leg2_leap_for():
-        return [-.0, 0.05, -1.00]
-
-    @staticmethod
-    def leg2_leap_for_05():
-        return [.0, 0.25, -1.20]
+        return [-.0, 0.05, -1.7]
 
     @staticmethod
     def leg3_leap_for():
-        return [.0, -0.05, 1.0]
-
-    @staticmethod
-    def leg3_leap_for_05():
-        return [.0, -0.25, 1.20]
+        return [.0, -0.05, 1.07]
 
     @staticmethod
     def leg4_leap_for():
-        return [-0.0, -0.05, 1.00]
+        return [-0.0, -0.05, 1.07]
 
-    @staticmethod
-    def leg4_leap_for_05():
-        return [.05, -0.25, 1.20]
 
     # back legs slip forward methods
     @staticmethod
