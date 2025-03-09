@@ -122,7 +122,10 @@ class VehicleControlEventUnit(ControlEventUnit):
             self._reset_state()
 
         self.command = msg.dir
-        self.deg = msg.deg
+        if msg.deg == 0:
+            self.deg = 0.5
+        else:
+            self.deg = msg.deg
 
     # populate and publish the message use to publish commands to either sim or dynamixel servos
     def populate_and_publish(self):
