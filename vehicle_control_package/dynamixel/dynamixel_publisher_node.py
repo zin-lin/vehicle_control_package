@@ -76,7 +76,7 @@ class DynamixelPublisher(Node):
     def _forward(self):
         self.positions = DynamixelHelper.walk_forward(self.stage)
         if self.dyn_controller.in_range(self.positions):
-            if self.stage != 4:
+            if self.stage != 2:
                 self.stage += 1
             else:
                 self.stage = 1
@@ -113,6 +113,7 @@ class DynamixelPublisher(Node):
 
     # publish messages
     def publish_and_populate(self):
+        self.dyn_controller.in_range(self.positions)
         match self.command:
             case 1.0:
                 self.velocities = [0,0,0,0]
@@ -135,6 +136,7 @@ class DynamixelPublisher(Node):
             case _:
                 self.velocities = [0,0,0,0]
                 self._reset()
+
         self.dyn_controller.write_goal_position(self.positions)
         self.dyn_controller.write_goal_velocity(self.velocities)
 

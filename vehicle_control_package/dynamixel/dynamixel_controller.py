@@ -1,15 +1,24 @@
 """
 Zin Lin Htun
 """
+import os
 
 # import statements
 from dynamixel_sdk import *  # Dynamixel SDK library import
 from rclpy.node import Node
+import time
+
+LOG = "logs"
+FILE = f"joints_{time.time()}.csv"
+VOL_FILE = f"voltage_{time.time()}.csv"
 
 # Dynamixel main class
 class DynamixelController:
     # constructor
     def __init__(self, device_name, protocol_version, baudrate, node:Node):
+        # time
+        self.time = time.time()
+
         # set node
         self.publisher_node = node
         self.logger = self.publisher_node.get_logger()
@@ -26,6 +35,13 @@ class DynamixelController:
                     2050, 2050, 2050,
                     2050, 2050, 2050
                     ]
+
+        self.feedback_voltage = [
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0
+                    ]
         self.wheels = [14, 24, 34, 44]
         # self.dynamixel attributes
         self.device_name = device_name
@@ -36,9 +52,25 @@ class DynamixelController:
         self.velocity_address = 104
         self.position_address = 116
         self.present_position_address = 132
+        self.present_input_voltage_address = 144
         self._init_dynamixel_client()
         # set up sync write
         self._initiate_sync_write()
+        self.logfile = ""
+        self.voltage_logfile = ""
+        self._init_log()
+
+    # initiate log
+    def _init_log(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.logfile = os.path.join(current_dir, LOG, FILE)
+        self.voltage_logfile = os.path.join(current_dir, LOG, VOL_FILE)
+        self.logger.info("Initializing log file")
+        with open(self.logfile, "a+") as file:
+            file.write("11,12,13,21,22,23,31,32,33,41,42,43,time\n")
+
+        with open(self.voltage_logfile, "a+") as file:
+            file.write("11,12,13,21,22,23,31,32,33,41,42,43,time\n")
 
     # initiate dynamixel servo
     def _init_dynamixel_client(self):
@@ -70,7 +102,8 @@ class DynamixelController:
     # set operating mode
     def _set_velocity_mode(self ):
         for wheel in self.wheels:
-            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, wheel, self.address_operating_mode, self.operating_mode)
+            dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, wheel, self.address_operating_mode,
+                                                                           self.operating_mode)
             if dxl_comm_result != COMM_SUCCESS:
                 self.logger.info(f"Failed to set velocity mode for ID {wheel}: {self.packetHandler.getTxRxResult(dxl_comm_result)}")
             elif dxl_error:
@@ -108,6 +141,7 @@ class DynamixelController:
         self.wheel_sync_write = GroupSyncWrite(self.portHandler, self.packetHandler, self.velocity_address, 4)  # For XL330-M288T
         self.joint_sync_read = GroupSyncRead(self.portHandler, self.packetHandler, self.present_position_address, 4)  # For XL330-M288T
         self.wheel_sync_read = GroupSyncRead(self.portHandler, self.packetHandler, self.present_position_address, 4)  # For XL330-M288T
+        self.voltage_read = GroupSyncRead(self.portHandler, self.packetHandler, self.present_input_voltage_address, 2)  # For XL330-M288T
 
     # write sync param for position
     def _write_parameters_position(self, joint_id, value):
@@ -133,6 +167,8 @@ class DynamixelController:
 
     # set feedback values
     def _get_feedback(self):
+
+        # sync read position
         for joint_id in self.joints:
             dxl_addparam_result = self.joint_sync_read.addParam(joint_id)
             if not dxl_addparam_result:
@@ -146,20 +182,63 @@ class DynamixelController:
             self.logger.info(f"Communication failed: {self.packetHandler.getTxRxResult(dxl_comm_result)}")
             exit()
 
+        # sync read voltage
+        for joint_id in self.joints:
+            dxl_addparam_result_v = self.voltage_read.addParam(joint_id)
+            if not dxl_addparam_result_v:
+                self.logger.info(f"Failed to add parameter for JOINT of ID {joint_id} ok ")
+                # exit()
+
+        # Perform de Operation: Sync Read
+        time.sleep(0.07)
+        dxl_comm_result_v = self.voltage_read.txRxPacket()
+        if dxl_comm_result_v != COMM_SUCCESS:
+            self.logger.info(f"Communication failed: {self.packetHandler.getTxRxResult(dxl_comm_result)}")
+            exit()
+
         # Retrieve and log the position data for each motor
         # counter
         count = 0
+        line = ""
+        vol_line = ""
+
+        # feedback for joints
         for joint_id in self.joints:
             if self.joint_sync_read.isAvailable(joint_id, self.present_position_address, 4):
                 # if parameter exists then log this
                 dxl_position = self.joint_sync_read.getData(joint_id, self.present_position_address, 4)
                 self.feedback[count] = dxl_position
                 self.logger.info(f"Dynamixel ID {joint_id} - Present Position: {dxl_position}")
+                line += f"{dxl_position},"
             else:
                 self.logger.info(f"Failed to get data for ID {joint_id}")
             count += 1
         for i in self.feedback:
             self.logger.info(f"Dynamixel ID {i} - Feedback: {i}")
+
+        # feedback for voltage
+        count = 0
+        for joint_id in self.joints:
+            if self.voltage_read.isAvailable(joint_id, self.present_input_voltage_address, 2):
+                # if parameter exists then log this
+                dxl_position = self.voltage_read.getData(joint_id, self.present_input_voltage_address, 2)
+                self.feedback_voltage[count] = dxl_position
+                self.logger.info(f"Dynamixel ID {joint_id} - Present Voltage: {dxl_position}")
+                vol_line += f"{dxl_position},"
+            else:
+                self.logger.info(f"Failed to get data for ID {joint_id}")
+            count += 1
+
+        # log
+        lapsed = time.time() - self.time
+        line += f"{lapsed}\n"
+        vol_line += f"{lapsed}\n"
+
+        with open(self.logfile, "a+") as file:
+            file.write(line)
+
+        with open(self.voltage_logfile, "a+") as file:
+            file.write(vol_line)
 
     # write sync param for velocity
     def _write_parameters_velocity(self, wheel_id, value):
